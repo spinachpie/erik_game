@@ -151,5 +151,39 @@
     "down": "",
     "in": "",
     "out": ""
+  },
+  "STABLES": {
+    "brief_desc": "Stables",
+    "long_desc": " These are the stables for the horses that lived in the castle. Brushes and saddles lie around, but there isn't anything worth taking. An exit lies to the north. ",
+    "dark?": false,
+    "north": "CASTLE_COURTYARD",
+    "south": "",
+    "east": "",
+    "west": "",
+    "northeast": "",
+    "northwest": "",
+    "southeast": "",
+    "southwest": "",
+    "up": "",
+    "down": "",
+    "in": "",
+    "out": ""
+  },
+   "DINING_HALL": {
+    "brief_desc":" Dining Hall",
+    "long_desc": " This is where everybody in the castle would eat. There is a special platform where the king and his advisers would sit. ",
+    "dark?": false,
+    "north": "",
+    "south": "",
+    "east": "",
+    "west": "CASTLE_COURTYARD",
+    "northeast": "",
+    "northwest": "",
+    "southeast": "",
+    "southwest": "",
+    "up": "",
+    "down": "",
+    "in": "",
+    "out": ""
   }
 }
