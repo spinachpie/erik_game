@@ -13,6 +13,7 @@ import textwrap
 ######################### CONTEXT #########################
 
 # This class is a package of all of the major object containers which can easily be passed to action handlers
+#  It also includes some useful helper methods
 class Context:
     def __init__(self, player, locations, actions, items, state, events):
         self.player = player
@@ -29,6 +30,28 @@ class Context:
 
     def PrintItemInString(self, default_string, item):
         self.Print(default_string.replace("@", "the " + item.get("name")))
+
+    def RemoveItemFromGame(self, item_key):
+        items.RemoveItemFromGame(item_key)
+
+    def MoveItemToInventory(self, item_key):
+        items.MoveItemToInventory(item_key)
+
+    def MoveItemToPlayerLoc(self, item_key):
+        items.MoveItemToPlayerLoc(item_key)
+
+    def SetItemFlag(self, item_key, flag):
+        items.SetFlag(item_key, flag)
+
+    def ClearItemFlag(self, item_key, flag):
+        items.ClearFlag(item_key, flag)
+
+    def CheckItemFlag(self, item_key, flag):
+        return items.CheckFlag(item_key, flag)
+
+    def ItemIsHere(self, item_key):
+        return (item_key in player.inventory) or (item_key in player.GetPlayerLocation()["items"])
+
 ######################### PLAYER #########################
 
 # This class contains player status information
@@ -48,6 +71,9 @@ class Player:
     def GetPlayerLocation(self):
         return locations[self.location]
 
+    def YouDie(self):
+        globals.YouDie(context)
+
 ######################### GLOBAL CONDITIONS #########################
 
 # This class is used to track various state variables and history
@@ -56,6 +82,8 @@ class State:
         self.turn_counter = 0
         self.quit_confirmed = False
         self.quit_pending = False
+        self.restart_confirmed = False
+        self.restart_pending = False
         self.waiting_for_object = False
         self.this_action = None
         self.this_object = None
@@ -128,7 +156,7 @@ class LocationsMaster:
             return True
         if not first_time_here:
             player.SetPlayerLocation(new_location_key)
-            Print(new_location["brief_desc"])
+            Print("[" + new_location["brief_desc"] + "]")
             if not self.IsDark():
                 self.DescribeItemsInLocation()
         else:
@@ -138,7 +166,7 @@ class LocationsMaster:
     # This function implements a LOOK action
     def DoLook(self):
         location = self.locations_dictionary[player.location]
-        Print(location["brief_desc"])
+        Print("[" + location["brief_desc"] + "]")
         if self.IsDark():
             Print("It is pitch dark in here.")
         else:
@@ -199,6 +227,7 @@ class ActionsMaster:
 
     # Parse the user's command (this is the first function called)
     def ParseCommand(self, command_string):
+        state.parse_successful = False
         state.this_user_input = command_string
         command_string = str.upper(command_string).replace("PICK UP", "GET").replace("L AT", "EXAMINE").replace(
             "LOOK AT", "EXAMINE").strip()
@@ -222,6 +251,20 @@ class ActionsMaster:
             if (command_string == 'N') or (command_string == 'NO'):
                 Print("Okay, Quit cancelled.")
                 state.quit_pending = False
+                return
+
+        # Handle case where we're waiting to see if the user confirmed a RESTART (by typing Y or N)
+        if state.restart_pending and (len(command_words) == 1):
+            if (command_string == 'Y') or (command_string == 'YES'):
+                print()
+                print("Restarting...")
+                print()
+                print()
+                state.restart_confirmed = True
+                return
+            if (command_string == 'N') or (command_string == 'NO'):
+                Print("Okay, Restart cancelled.")
+                state.restart_pending = False
                 return
 
         word_one_item = None
@@ -295,7 +338,7 @@ class ActionsMaster:
         state.parse_successful = True
         if (not action.get("requires_object?")) or ((item["key"] == "ALL") and (not action.get("supports_all?"))):
             Print("I don't understand that command.")
-        elif not items.TestIfItemIsHere(item):
+        elif not items.TestIfItemIsHere(item["key"]):
             return
         else:
             # First, test if there is a location handler for this location...
@@ -347,24 +390,40 @@ class ItemsMaster:
 
     # Check dictionary for item string
     def MatchStringToItem(self, item_string):
+        matches = []
         for item_key in self.items_dictionary:
             if item_string in self.items_dictionary[item_key]["words"]:
-                return self.items_dictionary[item_key]
+                matches.append(item_key)
 
-        # No match found
-        return None
+        if len(matches) == 0:
+            return None
+        elif len(matches) == 1:
+            return self.items_dictionary[matches[0]]
+
+        # Multiple matches on word; try to find one that's present in the room
+        matches_here = []
+        for item_key in matches:
+            if self.TestIfItemIsHere(item_key, False):
+                matches_here.append(item_key)
+
+        if len(matches_here) == 0:
+            return self.items_dictionary[matches[0]]
+        else:
+            return self.items_dictionary[matches_here[0]]
 
     # Returns true if the item is present (in inventory or in the room) and visible?
-    def TestIfItemIsHere(self, item):
-        if item["key"] == "ALL":
+    def TestIfItemIsHere(self, item_key, complain_if_not_here=True):
+        if item_key == "ALL":
             return True
-        if item["key"] in player.inventory:
+        if item_key in player.inventory:
             return True
         if locations.IsDark():
-            self.YouCantSeeItemHere()
+            if complain_if_not_here:
+                self.YouCantSeeItemHere()
             return False
-        if not item["key"] in player.GetPlayerLocation()["items"]:
-            self.YouCantSeeItemHere()
+        if not item_key in player.GetPlayerLocation()["items"]:
+            if complain_if_not_here:
+                self.YouCantSeeItemHere()
             return False
         return True
 
@@ -425,6 +484,32 @@ class ItemsMaster:
         player.GetPlayerLocation()["items"].append(item_key)
         player.inventory.remove(item_key)
 
+    # Remove the item from the game (for items that are destroyed, eaten, etc)
+    def RemoveItemFromGame(self, item_key):
+        if item_key in player.inventory:
+            player.inventory.remove(item_key)
+        else:
+            for loc_key in locations.locations_dictionary:
+                if item_key in locations[loc_key]["items"]:
+                    locations[loc_key]["items"].remove(item_key)
+
+    def MoveItemToInventory(self, item_key):
+        self.RemoveItemFromGame(item_key)
+        player.inventory.append(item_key)
+
+    def MoveItemToPlayerLoc(self, item_key):
+        self.RemoveItemFromGame(item_key)
+        player.GetPlayerLocation()["items"].append(item_key)
+
+    def SetFlag(self, item_key, flag):
+        self.items_dictionary[item_key][flag] = True
+
+    def ClearFlag(self, item_key, flag):
+        self.items_dictionary[item_key][flag] = False
+
+    def CheckFlag(self, item_key, flag):
+        return self.items_dictionary[item_key][flag] == True
+
 ######################### EVENTS #########################
 
 class Event:
@@ -440,6 +525,7 @@ class EventsMaster:
 
     # Each turn, we go through the event queue to see if any are supposed to trigger this turn.
     def CheckEvents(self, turn_counter):
+        globals.EveryMoveEvents(context)
         new_events = []
         for event in self.events:
             if event.trigger_turn == turn_counter:
@@ -470,24 +556,35 @@ def PrintItemInString(default_string, item):
 
 ######################### MAIN LOOP #########################
 
-# Set up the master object containers and the context container
-player = Player()
-locations = LocationsMaster()
-actions = ActionsMaster()
-items = ItemsMaster()
-events = EventsMaster()
-state = State()
-context = Context(player, locations, actions, items, state, events)
-action_handlers.Register(context)
-item_handlers.Register(context)
-location_handlers.Register(context)
-
-# Here is the MAIN LOOP
-def Play():
+# Initialize all game variables
+def InitializeGame():
+    global player
+    global locations
+    global actions
+    global items
+    global events
+    global state
+    global context
+    player = Player()
+    locations = LocationsMaster()
+    actions = ActionsMaster()
+    items = ItemsMaster()
+    events = EventsMaster()
+    state = State()
+    context = Context(player, locations, actions, items, state, events)
+    action_handlers.Register(context)
+    item_handlers.Register(context)
+    location_handlers.Register(context)
     globals.IntroText(context)
     globals.InitialSetup(context)
     locations.DoLook()
+
+# Here is the MAIN LOOP
+def Play():
+    InitializeGame()
     while not state.quit_confirmed:
+        if state.restart_confirmed:
+            InitializeGame()
         print()
         actions.ParseCommand(input("> "))
         state.PostProcess()

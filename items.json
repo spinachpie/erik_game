@@ -13,6 +13,19 @@
     "takeable?": true,
     "init_loc": "CASTLE_GATE"
   },
+  "BREAD": {
+    "name": "loaf of bread",
+    "words": ["BREAD", "LOAF"],
+    "takeable?": true,
+    "init_loc": "KITCHENS"
+  },
+  "DOLL": {
+    "name": "ghostly doll",
+    "examine_string": "The doll left behind by the apparition is in the form of expressionless human child wrapped in tattered sheets. It kind of reminds you of your annoying cousin Scott.",
+    "words": ["DOLL"],
+    "takeable?": true,
+    "init_loc": null
+  },
   "TORCH": {
     "name": "torch",
     "long_desc": "flickering torch",
@@ -32,6 +45,29 @@
     "words": ["WEAPON", "WEAPONS", "RACK", "RACKS"],
     "init_loc": "GUARDS_QUARTERS",
     "do_not_list?": true
+  },
+  "ORC": {
+    "name": "nasty orc",
+    "examine_string": "The orc is clad in dull, bloodstained chainmail and wields a massive spear. He kind of reminds you of your annoying cousin Scott.",
+    "words": ["ORC"],
+    "init_loc": "CELLBLOCK_2",
+    "do_not_list?": true,
+    "hp": 100,
+    "is_alive?": true
+  },
+  "DEAD_ORC": {
+    "name": "dead orc",
+    "words": ["ORC", "BODY", "CORPSE"],
+    "init_loc": null
+  },
+  "SCROLL": {
+    "name": "crumpled scroll",
+    "examine_string": "The scroll looks like it has a map of a maze.",
+    "words": ["SCROLL"],
+    "seen?": false,
+    "takeable?": true,
+    "readable?": true,
+    "init_loc": null
   },
   "ALL": { "name": "All", "words": "ALL" }
 }
